@@ -1,8 +1,19 @@
 <script setup>
-import { reactive } from "vue";
+import { reactive, onBeforeMount, onMounted } from "vue";
 import axios from "axios";
 import router from '../router/index'
 import { useToast } from "vue-toastification";
+import { useRoute } from "vue-router";
+import PulseLoader from 'vue-spinner/src/PulseLoader.vue'
+
+const toast = useToast();
+
+const state = reactive({
+    isLoading: true
+});
+
+const route = useRoute();
+const jobId = route.params.id;
 
 const formDefaultValues = {
     type: [
@@ -27,10 +38,10 @@ const formDefaultValues = {
 }
 
 const form = reactive({
-    type: formDefaultValues.type[0],
+    type: '',
     title: '',
     description: '',
-    salary: formDefaultValues.salary[0],
+    salary: '',
     location: '',
     company: {
         name: '',
@@ -40,7 +51,21 @@ const form = reactive({
     }
 });
 
-const toast = useToast();
+const getJob = async (jobId) => {
+    try {
+        const res = await axios.get(`/api/jobs/${jobId}`);
+        Object.assign(form, res.data);
+        if (res.data.company) Object.assign(form.company, res.data.company);
+    } catch (error) {
+        console.error("Error while geting a job", error);
+    } finally {
+        state.isLoading = false;
+    }
+}
+
+onMounted(async () => {
+    await getJob(jobId);
+});
 
 const handleSubmit = async () => {
     try {
@@ -58,23 +83,23 @@ const handleSubmit = async () => {
             }
         }
 
-        const res = await axios.post(`/api/jobs`, newJob);
-        toast.success('Job Added Sucessfully');
+        const res = await axios.patch(`/api/jobs/${jobId}`, newJob);
+        toast.success('Job Edit Sucessfully');
         router.push(`/jobs/${res.data.id}`);
 
     } catch (error) {
-        console.error("Error while adding job", error);
+        console.error("Error while editing job", error);
         toast.error('Job not added, check console for more info')
     }
 };
 
 </script>
 <template>
-    <section class="bg-green-50">
+    <section v-if="!state.isLoading" class="bg-green-50">
         <div class="container m-auto max-w-2xl py-24">
             <div class="bg-white px-6 py-8 mb-4 shadow-md rounded-md border m-4 md:m-0">
                 <form @submit.prevent="handleSubmit">
-                    <h2 class="text-3xl text-center font-semibold mb-6">Add Job</h2>
+                    <h2 class="text-3xl text-center font-semibold mb-6">Update Job</h2>
 
                     <div class="mb-4">
                         <label for="type" class="block text-gray-700 font-bold mb-2">Job Type</label>
@@ -147,11 +172,14 @@ const handleSubmit = async () => {
                         <button
                             class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full w-full focus:outline-none focus:shadow-outline"
                             type="submit">
-                            Add Job
+                            Save Job
                         </button>
                     </div>
                 </form>
             </div>
         </div>
     </section>
+    <div v-else class="text-center text-gray-500 py-6">
+        <PulseLoader />
+    </div>
 </template>
